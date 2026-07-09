@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Environment files — real secrets live here, never in git.
+# .env.example is intentionally NOT ignored: it documents required
+# variable names with placeholder values.
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+
+# Test artifacts
+coverage/
+
+# Logs
+*.log
+
+# Editor & OS noise
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,16 @@
+{
+  "name": "aqlis",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Live Shariah stock-screening dashboard",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present"
+  }
+}
