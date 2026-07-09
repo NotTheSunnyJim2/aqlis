@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// A company on the Aqlis watchlist.
+model Company {
+  id        String   @id @default(cuid())
+  /// Ticker symbol as used by our data providers (e.g. "AAPL").
+  /// Unique today, but NOT the primary key: tickers get reused and
+  /// companies change symbols — identity must outlive the label.
+  symbol    String   @unique
+  name      String
+  exchange  String
+  /// Provider-reported sector; input to the business-activity screen.
+  sector    String?
+  /// Soft watchlist membership: removing a company must not delete
+  /// its snapshot/verdict history.
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  priceSnapshots        PriceSnapshot[]
+  fundamentalsSnapshots FundamentalsSnapshot[]
+  complianceVerdicts    ComplianceVerdict[]
+  driftAlerts           DriftAlert[]
+
+  @@map("companies")
+}
+
+enum DriftAlertType {
+  /// Overall status changed (e.g. COMPLIANT -> NON_COMPLIANT).
+  VERDICT_FLIPPED
+  /// A single ratio crossed its methodology threshold, in either
+  /// direction, even if the overall verdict held.
+  RATIO_THRESHOLD_CROSSED
+}
+
+enum RatioKind {
+  DEBT
+  CASH
+  RECEIVABLES
+  NON_COMPLIANT_INCOME
+}
+
+/// A detected change between two consecutive verdicts for a company.
+/// Produced by the drift detector (Phase 10); pushed live to the
+/// dashboard (Phase 12).
+model DriftAlert {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  type DriftAlertType
+
+  // ---- The comparison that raised the alert ----
+  fromVerdictId String            @map("from_verdict_id")
+  fromVerdict   ComplianceVerdict @relation("driftFrom", fields: [fromVerdictId], references: [id])
+  toVerdictId   String            @map("to_verdict_id")
+  toVerdict     ComplianceVerdict @relation("driftTo", fields: [toVerdictId], references: [id])
+
+  /// Which ratio crossed — only for RATIO_THRESHOLD_CROSSED.
+  ratio RatioKind?
+
+  // ---- Numbers for the alert feed: "DEBT crossed 0.33: 0.318 -> 0.342" ----
+  previousValue Decimal? @map("previous_value") @db.Decimal(10, 6)
+  currentValue  Decimal? @map("current_value") @db.Decimal(10, 6)
+  threshold     Decimal? @db.Decimal(10, 6)
+
+  detectedAt DateTime @default(now()) @map("detected_at")
+
+  @@unique([toVerdictId, type, ratio])
+  @@index([detectedAt(sort: Desc)])
+  @@map("drift_alerts")
+}
+
+/// Three-state on purpose: a screen with missing inputs must say
+/// UNKNOWN, never guess in either direction.
+enum ComplianceStatus {
+  COMPLIANT
+  NON_COMPLIANT
+  UNKNOWN
+}
+
+/// One screening run's conclusion for one company — an APPEND-ONLY
+/// audit trail. Verdict rows are never updated or deleted: each is a
+/// fact about a moment, carrying the exact inputs and computed ratios
+/// that produced it.
+model ComplianceVerdict {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  status ComplianceStatus
+  /// Machine-readable failure/uncertainty codes, e.g.
+  /// "DEBT_RATIO_EXCEEDED", "MISSING_TOTAL_DEBT".
+  reasons String[]
+
+  // ---- Provenance: the exact inputs this verdict was computed from ----
+  priceSnapshotId        String?               @map("price_snapshot_id")
+  priceSnapshot          PriceSnapshot?        @relation(fields: [priceSnapshotId], references: [id])
+  fundamentalsSnapshotId String?               @map("fundamentals_snapshot_id")
+  fundamentalsSnapshot   FundamentalsSnapshot? @relation(fields: [fundamentalsSnapshotId], references: [id])
+
+  // ---- Computed values, frozen for audit ----
+  marketCap               Decimal? @map("market_cap") @db.Decimal(20, 2)
+  debtRatio               Decimal? @map("debt_ratio") @db.Decimal(10, 6)
+  cashRatio               Decimal? @map("cash_ratio") @db.Decimal(10, 6)
+  receivablesRatio        Decimal? @map("receivables_ratio") @db.Decimal(10, 6)
+  nonCompliantIncomeRatio Decimal? @map("non_compliant_income_ratio") @db.Decimal(10, 6)
+  businessActivityPass    Boolean? @map("business_activity_pass")
+
+  computedAt DateTime @default(now()) @map("computed_at")
+
+  driftAlertsFrom DriftAlert[] @relation("driftFrom")
+  driftAlertsTo   DriftAlert[] @relation("driftTo")
+
+  @@index([companyId, computedAt(sort: Desc)])
+  @@map("compliance_verdicts")
+}
+
+/// One reported set of company accounts (a quarterly or annual filing)
+/// as ingested from FMP. Financial figures are nullable on purpose:
+/// filings omit line items, and the screening engine must handle
+/// "missing" explicitly — a missing figure is NOT zero.
+model FundamentalsSnapshot {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  /// Last day of the reporting period (FMP `date`).
+  periodEndDate DateTime @map("period_end_date")
+  /// Period label: "Q1".."Q4" or "FY". Part of the unique key because a
+  /// company's FY and Q4 filings share the same period end date.
+  period     String
+  fiscalYear String @map("fiscal_year")
+  /// When the filing became public (FMP `acceptedDate`). Point-in-time
+  /// rule: a verdict may only use fundamentals accepted BEFORE the
+  /// moment the verdict is computed.
+  acceptedAt DateTime @map("accepted_at")
+
+  reportedCurrency String @map("reported_currency")
+
+  // ---- Ratio-screen inputs (balance sheet) ----
+  totalDebt                   Decimal? @map("total_debt") @db.Decimal(20, 2)
+  cashAndShortTermInvestments Decimal? @map("cash_and_short_term_investments") @db.Decimal(20, 2)
+  netReceivables              Decimal? @map("net_receivables") @db.Decimal(20, 2)
+  totalAssets                 Decimal? @map("total_assets") @db.Decimal(20, 2)
+
+  // ---- Ratio-screen inputs (income statement) ----
+  revenue        Decimal? @db.Decimal(20, 2)
+  interestIncome Decimal? @map("interest_income") @db.Decimal(20, 2)
+
+  /// For deriving market cap (price × shares) at screening time.
+  sharesOutstanding Decimal? @map("shares_outstanding") @db.Decimal(20, 0)
+
+  ingestedAt DateTime @default(now()) @map("ingested_at")
+
+  verdicts ComplianceVerdict[]
+
+  @@unique([companyId, periodEndDate, period])
+  @@index([companyId, acceptedAt(sort: Desc)])
+  @@map("fundamentals_snapshots")
+}
+
+/// One windowed price observation. NOT a raw tick: the ingestion worker
+/// aggregates each 15–30s window and emits the last trade in it
+/// (free-tier command budget — see ADR-001).
+model PriceSnapshot {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  /// Last traded price in the window, USD.
+  price Decimal @db.Decimal(18, 4)
+
+  /// Provider event time: when the price was true at the exchange.
+  observedAt DateTime @map("observed_at")
+  /// Our pipeline time: when the consumer wrote the row.
+  ingestedAt DateTime @default(now()) @map("ingested_at")
+
+  verdicts ComplianceVerdict[]
+
+  @@unique([companyId, observedAt])
+  @@index([companyId, observedAt(sort: Desc)])
+  @@map("price_snapshots")
+}

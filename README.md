@@ -39,7 +39,7 @@ Every non-trivial choice has an Architecture Decision Record in
 > updated as each piece ships.
 
 ```bash
-cp .env.example .env   # then fill in your own API keys
+cp .env.example apps/server/.env   # then fill in your own credentials
 ```
 
 ## How to test
