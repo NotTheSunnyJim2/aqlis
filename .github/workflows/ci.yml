@@ -19,6 +19,13 @@ jobs:
 
       - run: npm ci
 
+      # The Prisma client is generated code, correctly .gitignored — it
+      # must be regenerated on every fresh checkout, before anything
+      # that needs its types (lint's type-aware rules, typecheck, and
+      # runtime imports in tests). Schema-only: needs no DB connection,
+      # so no secrets required here.
+      - run: npm run generate
+
       - run: npm run lint
 
       - run: npm run typecheck
