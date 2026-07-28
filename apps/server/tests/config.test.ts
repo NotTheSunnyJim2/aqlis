@@ -4,6 +4,7 @@ import { loadConfig } from "../src/config.js";
 /** A minimal valid environment; individual tests override fields. */
 const validEnv = {
   REDIS_URL: "rediss://default:pw@example.upstash.io:6379",
+  DATABASE_URL: "postgresql://user:pw@example.neon.tech/neondb",
   FINNHUB_API_KEY: "test-key",
   FMP_API_KEY: "test-fmp-key",
   WATCHLIST_SYMBOLS: "AAPL,MSFT",

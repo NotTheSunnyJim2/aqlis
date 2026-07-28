@@ -1,10 +1,35 @@
+import "dotenv/config";
+import { Redis } from "ioredis";
 import { buildApp } from "./app.js";
+import { loadConfig } from "./config.js";
+import { createPrismaClient } from "./db.js";
+
+const config = loadConfig();
+const prisma = createPrismaClient(config.databaseUrl);
+// lazyConnect: don't open the socket until first use — /health (pure
+// liveness) shouldn't require Redis to be reachable to answer.
+const redis = new Redis(config.redisUrl, { lazyConnect: true });
 
 const app = buildApp({
   logger:
     process.env.NODE_ENV === "production"
       ? true // raw JSON lines: logs are data in production
       : { transport: { target: "pino-pretty" } },
+  checkDatabase: async () => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  checkRedis: async () => {
+    try {
+      return (await redis.ping()) === "PONG";
+    } catch {
+      return false;
+    }
+  },
 });
 
 const port = Number(process.env.PORT ?? 3000);
@@ -22,6 +47,8 @@ try {
 async function shutdown(signal: string): Promise<void> {
   app.log.info({ signal }, "shutting down");
   await app.close();
+  await prisma.$disconnect();
+  redis.disconnect();
   process.exit(0);
 }
 

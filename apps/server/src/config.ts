@@ -10,6 +10,11 @@ const envSchema = z.object({
   REDIS_URL: z
     .string()
     .startsWith("rediss://", "REDIS_URL must be a TLS Upstash URL (rediss://)"),
+  // The POOLED Neon connection — see prisma.config.ts for why migrations
+  // use a separate DIRECT connection instead.
+  DATABASE_URL: z
+    .string()
+    .startsWith("postgresql://", "DATABASE_URL must be a postgresql:// connection string"),
   FINNHUB_API_KEY: z.string().min(1, "FINNHUB_API_KEY is required"),
   FMP_API_KEY: z.string().min(1, "FMP_API_KEY is required"),
   WATCHLIST_SYMBOLS: z.string().min(1, "WATCHLIST_SYMBOLS is required"),
@@ -32,6 +37,7 @@ const envSchema = z.object({
 /** Validated, typed configuration used across the app. */
 export interface AppConfig {
   redisUrl: string;
+  databaseUrl: string;
   finnhubApiKey: string;
   fmpApiKey: string;
   /** Upper-cased, de-duplicated ticker list. */
@@ -76,6 +82,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
 
   return {
     redisUrl: env.REDIS_URL,
+    databaseUrl: env.DATABASE_URL,
     finnhubApiKey: env.FINNHUB_API_KEY,
     fmpApiKey: env.FMP_API_KEY,
     watchlist,

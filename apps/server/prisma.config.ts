@@ -7,6 +7,9 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    // Prisma 7 no longer auto-seeds after `migrate dev`; run explicitly
+    // via `npx prisma db seed`.
+    seed: "tsx prisma/seed.ts",
   },
   datasource: {
     // CLI tooling (migrate, db pull) must use the DIRECT connection:

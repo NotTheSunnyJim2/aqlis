@@ -1,5 +1,8 @@
 import WebSocket from "ws";
 import { parseTradeMessage, type FinnhubTrade } from "./finnhub-message.js";
+import type { Logger } from "../logger.js";
+
+export type { Logger };
 
 const DEFAULT_URL = "wss://ws.finnhub.io";
 
@@ -20,14 +23,6 @@ function rawDataToString(data: WebSocket.RawData): string {
 const DEFAULT_HEARTBEAT_MS = 15_000;
 const DEFAULT_BACKOFF_BASE_MS = 1_000;
 const DEFAULT_BACKOFF_MAX_MS = 30_000;
-
-/** Minimal structural logger; a pino instance satisfies this. */
-export interface Logger {
-  info(obj: object, msg?: string): void;
-  warn(obj: object, msg?: string): void;
-  error(obj: object, msg?: string): void;
-  debug(obj: object, msg?: string): void;
-}
 
 export interface FinnhubPriceClientOptions {
   apiKey: string;
