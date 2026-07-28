@@ -8,6 +8,9 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
+    // `ws` (and other CJS deps) export via `export =`; interop lets us
+    // default-import them the way Node's ESM actually resolves them.
+    "esModuleInterop": true,
 
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
