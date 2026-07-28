@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "worker:price": "tsx src/workers/price-worker.ts",
+    "worker:fundamentals": "tsx src/workers/fundamentals-worker.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"

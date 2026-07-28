@@ -11,6 +11,7 @@ const envSchema = z.object({
     .string()
     .startsWith("rediss://", "REDIS_URL must be a TLS Upstash URL (rediss://)"),
   FINNHUB_API_KEY: z.string().min(1, "FINNHUB_API_KEY is required"),
+  FMP_API_KEY: z.string().min(1, "FMP_API_KEY is required"),
   WATCHLIST_SYMBOLS: z.string().min(1, "WATCHLIST_SYMBOLS is required"),
   // Strings from the environment are coerced to a number and bounded.
   // Absent -> defaults to 30s.
@@ -19,16 +20,26 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(30),
+  // Fundamentals change quarterly; polling every 6h is ample and keeps
+  // FMP requests (24 per poll) well under the 250/day free-tier cap.
+  FUNDAMENTALS_POLL_INTERVAL_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(21_600),
 });
 
 /** Validated, typed configuration used across the app. */
 export interface AppConfig {
   redisUrl: string;
   finnhubApiKey: string;
+  fmpApiKey: string;
   /** Upper-cased, de-duplicated ticker list. */
   watchlist: string[];
   /** Flush cadence in milliseconds (derived from the *_SECONDS env var). */
   priceFlushIntervalMs: number;
+  /** Fundamentals poll cadence in milliseconds. */
+  fundamentalsPollIntervalMs: number;
 }
 
 /**
@@ -66,7 +77,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     redisUrl: env.REDIS_URL,
     finnhubApiKey: env.FINNHUB_API_KEY,
+    fmpApiKey: env.FMP_API_KEY,
     watchlist,
     priceFlushIntervalMs: env.PRICE_FLUSH_INTERVAL_SECONDS * 1000,
+    fundamentalsPollIntervalMs: env.FUNDAMENTALS_POLL_INTERVAL_SECONDS * 1000,
   };
 }
