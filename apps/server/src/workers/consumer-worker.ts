@@ -9,6 +9,7 @@ import { parsePriceEntry } from "../consumers/price-entry.js";
 import { writePriceSnapshot } from "../consumers/price-writer.js";
 import { parseFundamentalsEntry } from "../consumers/fundamentals-entry.js";
 import { writeFundamentalsSnapshot } from "../consumers/fundamentals-writer.js";
+import { recordVerdict } from "../consumers/verdict-recorder.js";
 import { PRICES_STREAM_KEY } from "../ingestion/price-publisher.js";
 import { FUNDAMENTALS_STREAM_KEY } from "../ingestion/fundamentals-publisher.js";
 
@@ -18,6 +19,12 @@ import { FUNDAMENTALS_STREAM_KEY } from "../ingestion/fundamentals-publisher.js"
  * hands-on Redis Streams session, now automated) and writes normalized
  * rows into Postgres. This is where the two-cadence design (sub-second
  * prices, quarterly fundamentals) becomes one consistent picture.
+ *
+ * After EITHER write succeeds, it also recomputes that company's
+ * Shariah verdict and records any drift from the previous one (Phase
+ * 10) — either input can change the outcome: a price move alone can
+ * shift market cap and every ratio derived from it, and a new filing
+ * changes the ratios directly.
  */
 
 const logger = pino(
@@ -58,6 +65,7 @@ function main(): void {
         return;
       }
       await writePriceSnapshot(prisma, companyId, entry);
+      await recordVerdict(prisma, registry, entry.symbol, logger);
     },
   });
 
@@ -75,6 +83,7 @@ function main(): void {
         return;
       }
       await writeFundamentalsSnapshot(prisma, companyId, entry);
+      await recordVerdict(prisma, registry, entry.symbol, logger);
     },
   });
 
