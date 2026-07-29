@@ -14,8 +14,15 @@ and streams all of it to a live dashboard over WebSockets.
 > drift is actually visible in real time — the entire point of the project.
 > Full rationale in [ADR-002](docs/adr/002-shariah-screening-methodology.md).
 > As a result, **Aqlis's verdicts are more volatile than a real index
-> provider's** and should not be treated as index-membership-grade. This
-> project is an educational implementation of a published methodology,
+> provider's** and should not be treated as index-membership-grade.
+>
+> **Terminology note:** Aqlis calculates *income purification* — donating
+> the small, tolerated fraction of a dividend traceable to impermissible
+> income (see [ADR-002](docs/adr/002-shariah-screening-methodology.md)).
+> This is **not zakat**, the separate obligatory annual wealth tax, which
+> Aqlis does not calculate.
+>
+> This project is an educational implementation of a published methodology,
 > **not** a religious ruling. Consult a qualified scholar for personal
 > rulings.
 
@@ -42,12 +49,28 @@ Every non-trivial choice has an Architecture Decision Record in
 
 ## How to run
 
-> Not yet runnable — the backend skeleton lands in Phase 5. This section is
-> updated as each piece ships.
+Requires Node 22 (see `.nvmrc`), a Neon Postgres database, and an Upstash
+Redis database — plus API keys for [Finnhub](https://finnhub.io) (prices)
+and [Financial Modeling Prep](https://financialmodelingprep.com) (fundamentals).
 
 ```bash
+npm install
 cp .env.example apps/server/.env   # then fill in your own credentials
+
+cd apps/server
+npx prisma migrate dev             # create the schema
+npm run db:seed                    # seed the watchlist companies
+
+# In separate terminals:
+npm run dev                        # API server — http://localhost:3000
+npm run worker:price                # Finnhub -> Redis Stream
+npm run worker:fundamentals         # FMP -> Redis Stream
+npm run worker:consumer             # streams -> Postgres, computes verdicts
 ```
+
+> The frontend dashboard is not yet built (Phase 13) — until then, the API
+> is reachable directly, e.g.
+> `curl -X POST localhost:3000/companies/AAPL/purification -d '{"dividendReceived":500}'`.
 
 ## How to test
 

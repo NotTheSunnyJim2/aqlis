@@ -3,6 +3,7 @@ import { Redis } from "ioredis";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { createPrismaClient } from "./db.js";
+import { decimalToNumber } from "./decimal.js";
 
 const config = loadConfig();
 const prisma = createPrismaClient(config.databaseUrl);
@@ -29,6 +30,21 @@ const app = buildApp({
     } catch {
       return false;
     }
+  },
+  lookupCompanyRatio: async (symbol) => {
+    const company = await prisma.company.findUnique({ where: { symbol }, select: { id: true } });
+    if (!company) {
+      return { found: false, nonCompliantIncomeRatio: null };
+    }
+    const verdict = await prisma.complianceVerdict.findFirst({
+      where: { companyId: company.id },
+      orderBy: { computedAt: "desc" },
+      select: { nonCompliantIncomeRatio: true },
+    });
+    return {
+      found: true,
+      nonCompliantIncomeRatio: decimalToNumber(verdict?.nonCompliantIncomeRatio),
+    };
   },
 });
 

@@ -3,15 +3,7 @@ import type { CompanyRegistry } from "./company-registry.js";
 import type { Logger } from "../logger.js";
 import { computeVerdict } from "../screening/verdict.js";
 import { detectDrift, type DriftComparableVerdict } from "../screening/drift.js";
-
-/**
- * Prisma returns Decimal instances (from decimal.js) for Decimal
- * columns, not plain numbers. Structural typing here accepts anything
- * with `.toNumber()` without importing Prisma's Decimal class directly.
- */
-function decimalToNumber(value: { toNumber(): number } | null | undefined): number | null {
-  return value === null || value === undefined ? null : value.toNumber();
-}
+import { decimalToNumber } from "../decimal.js";
 
 /**
  * Recomputes and persists a verdict for one company, using its LATEST
