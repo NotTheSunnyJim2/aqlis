@@ -21,8 +21,15 @@ model Company {
   symbol    String   @unique
   name      String
   exchange  String
-  /// Provider-reported sector; input to the business-activity screen.
+  /// Provider-reported sector — broad category (e.g. "Consumer
+  /// Cyclical"). Too coarse alone: MGM (casinos) and TSLA (autos)
+  /// share this sector. See `industry` for the exclusion-relevant
+  /// granularity.
   sector    String?
+  /// Finer-grained industry classification (e.g. "Resorts & Casinos",
+  /// "Banks—Diversified", "Auto Manufacturers"). The actual input to
+  /// the business-activity exclusion screen (Phase 9).
+  industry  String?
   /// Soft watchlist membership: removing a company must not delete
   /// its snapshot/verdict history.
   isActive  Boolean  @default(true) @map("is_active")

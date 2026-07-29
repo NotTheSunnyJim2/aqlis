@@ -7,10 +7,17 @@ compliance, calculates the purification amount for non-compliant income,
 and streams all of it to a live dashboard over WebSockets.
 
 > **Important:** the screening ratios and thresholds implemented here follow
-> a published index methodology (source cited in
-> [docs/adr](docs/adr/) once implemented — see Phase 9). This project is an
-> educational implementation of that methodology, **not** a religious ruling.
-> Consult a qualified scholar for personal rulings.
+> the [S&P Dow Jones Islamic Market Indices Methodology](https://www.spglobal.com/spdji/en/documents/methodologies/methodology-dj-islamic-market-indices.pdf)
+> (S&P Dow Jones Indices LLC, current edition), with one deliberate,
+> documented deviation: this tool uses **live (spot) market capitalization**
+> rather than the source's 24-month trailing average, so that compliance
+> drift is actually visible in real time — the entire point of the project.
+> Full rationale in [ADR-002](docs/adr/002-shariah-screening-methodology.md).
+> As a result, **Aqlis's verdicts are more volatile than a real index
+> provider's** and should not be treated as index-membership-grade. This
+> project is an educational implementation of a published methodology,
+> **not** a religious ruling. Consult a qualified scholar for personal
+> rulings.
 
 ## Why I built it
 
