@@ -95,3 +95,21 @@ it becomes unavoidable anyway. Run it locally:
 npx playwright install chromium   # once
 npm run test:e2e -w @aqlis/web    # auto-starts both servers, runs the flow, tears them down
 ```
+
+There's also a k6 load test (`k6/load-test.js`) that ramps 0→20 virtual
+users against `/api/companies` and `/api/companies/:symbol/verdict`,
+modeling a real dashboard visitor's browsing pattern (list, then one
+detail view, then a pause) rather than hammering every endpoint in a
+tight loop — a load test aims for realistic usage, not maximum
+throughput. Also **not** wired into CI, for the same reason as
+Playwright: it needs a real running server against real Postgres/Redis,
+which means real credentials CI doesn't have. Run it locally against
+the built server:
+
+```bash
+npm run build
+node apps/server/dist/index.js &   # or point BASE_URL at a different target
+npm run loadtest                   # defaults to http://localhost:3000
+```
+
+Thresholds: p95 request duration under 500ms, error rate under 1%.
