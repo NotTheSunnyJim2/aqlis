@@ -1,5 +1,8 @@
 # Aqlis
 
+**Live at [aqlis.fly.dev](https://aqlis.fly.dev)** — real Finnhub prices,
+real FMP fundamentals, real compliance verdicts, updating live.
+
 Live Shariah stock-screening dashboard. Aqlis ingests real-time prices and
 quarterly fundamentals for a watchlist of companies, runs a rules-based
 Shariah compliance screen on each, detects when a stock drifts in or out of
@@ -41,11 +44,46 @@ different cadences into one live, correct verdict is a real systems-design
 problem — queues, consumers, threshold detection, and push delivery — at a
 scale one person can build and defend end to end.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Ingestion
+        FH[Finnhub WS] -->|price ticks| PW[price worker]
+        FMP[FMP REST] -->|quarterly filings| FW[fundamentals worker]
+    end
+    PW -->|XADD| RS[(Redis Streams)]
+    FW -->|XADD| RS
+    RS -->|XREADGROUP| CW[consumer worker]
+    CW -->|snapshots| PG[(Postgres · Neon)]
+    CW -->|compute verdict + drift| SE[screening engine]
+    SE --> PG
+    CW -->|PUBLISH| PS[(Redis Pub/Sub)]
+    PS -->|SUBSCRIBE| API[Fastify API]
+    API -->|WebSocket| WEB[React dashboard]
+    WEB -->|REST| API
+    API -->|reads| PG
+```
+
+Two feeds with wildly different cadences (sub-second prices, quarterly
+fundamentals) join into one live verdict via a durable queue (Streams,
+[ADR-004](docs/adr/004-redis-dual-use.md)) and fan out to the browser via
+a separate, non-durable one (Pub/Sub, same ADR) — persistence where
+losing data matters, none where freshness is all that matters.
+
 ## Tech decisions
 
 Every non-trivial choice has an Architecture Decision Record in
-[docs/adr](docs/adr/). Start with
-[ADR-001: tech stack](docs/adr/001-tech-stack.md).
+[docs/adr](docs/adr/):
+
+- [ADR-001: tech stack](docs/adr/001-tech-stack.md) — the full stack and
+  why, including alternatives rejected (Kafka, Socket.IO, AWS, NoSQL)
+- [ADR-002: Shariah screening methodology](docs/adr/002-shariah-screening-methodology.md)
+  — the cited source, and the one deliberate deviation from it
+- [ADR-003: Fly-native deployment](docs/adr/003-fly-native-deployment.md)
+  — why Terraform was dropped mid-project, and what replaced it
+- [ADR-004: one Redis, two messaging patterns](docs/adr/004-redis-dual-use.md)
+  — Streams for ingestion, Pub/Sub for live fan-out, same instance
 
 ## How to run
 
@@ -88,8 +126,9 @@ There's also one Playwright end-to-end flow (`apps/web/e2e/`) that drives a
 real browser against the real stack — real Postgres, real Redis, the actual
 built frontend. It's intentionally **not** wired into CI: running it there
 would mean putting real Neon/Upstash credentials into GitHub Actions
-secrets, a decision deliberately deferred until Phase 17 (deploy), where
-it becomes unavoidable anyway. Run it locally:
+secrets, which CI has never needed for anything else in this project (every
+unit/integration test uses structural fakes at the I/O boundary instead).
+Run it locally:
 
 ```bash
 npx playwright install chromium   # once

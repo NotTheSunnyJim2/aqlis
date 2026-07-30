@@ -1,7 +1,7 @@
 # ADR 001 — Tech stack for Aqlis
 
 Date: 2026-07-09
-Status: Accepted
+Status: Accepted, partially superseded — see note below
 
 ## Context
 
@@ -21,6 +21,14 @@ serverless Postgres with Prisma for storage and migrations; native `ws`
 WebSockets to the browser; React + Vite + Tailwind frontend; Fly.io for
 deployment (Docker, Terraform-managed); GitHub Actions for CI; Vitest,
 Supertest, Playwright and k6 for the test pyramid; pino for structured logs.
+
+> **Superseded (2026-07-30):** the "Terraform-managed" clause above was
+> true when written, but Fly.io discontinued its official Terraform
+> provider before this project reached its infra-as-code phase. See
+> [ADR-003](003-fly-native-deployment.md) for the actual deployment
+> mechanism (`fly.toml` + Dockerfile) and the reasoning behind the
+> switch. Left unedited here — this ADR is a record of what was decided
+> and why on 2026-07-09, not a living document.
 
 ## Rationale
 
