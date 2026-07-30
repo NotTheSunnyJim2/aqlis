@@ -1,13 +1,22 @@
+import { useState } from "react";
 import { StockList } from "./components/StockList.js";
+import { RatioBreakdown } from "./components/RatioBreakdown.js";
 
 function App() {
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10 dark:bg-slate-900">
       <div className="mx-auto max-w-3xl">
         <h1 className="mb-6 text-3xl font-semibold text-slate-900 dark:text-slate-100">
           Aqlis
         </h1>
-        <StockList />
+        <StockList selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} />
+        {selectedSymbol && (
+          <div className="mt-6">
+            <RatioBreakdown key={selectedSymbol} symbol={selectedSymbol} />
+          </div>
+        )}
       </div>
     </main>
   );

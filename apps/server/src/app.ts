@@ -9,6 +9,28 @@ export interface CompanyRatioLookup {
   nonCompliantIncomeRatio: number | null;
 }
 
+export interface VerdictDetail {
+  found: boolean;
+  status: "COMPLIANT" | "NON_COMPLIANT" | "UNKNOWN" | null;
+  businessActivityPass: boolean | null;
+  /** String — same precision reasoning as latestPrice (large financial
+   * figure sourced/derived from external data). */
+  marketCap: string | null;
+  /**
+   * Ratios stay plain numbers, unlike marketCap/price: the screening
+   * engine has computed them as JS numbers since Phase 9 (vertict.ts's
+   * RatioResult) — they were never Decimal-precision-preserved through
+   * the pipeline, so converting now would add false precision, not
+   * protect real precision.
+   */
+  debtRatio: number | null;
+  cashRatio: number | null;
+  receivablesRatio: number | null;
+  nonCompliantIncomeRatio: number | null;
+  reasons: string[];
+  computedAt: string | null;
+}
+
 export interface CompanySummary {
   symbol: string;
   name: string;
@@ -57,6 +79,17 @@ export interface BuildAppOptions {
    * everything else here — app.ts never touches Prisma directly.
    * Omitted -> empty list (fails to "nothing to show", not fake data). */
   listCompanies?: () => Promise<CompanySummary[]>;
+  /**
+   * Full verdict detail for the ratio breakdown view — every ratio,
+   * its pass/fail, and the reason codes behind it. A SEPARATE function
+   * from lookupCompanyRatio even though both query "latest verdict for
+   * a symbol": each DI seam stays narrowly scoped to what its ONE
+   * route needs, matching every other injection point in this file,
+   * rather than forcing two different response shapes through one
+   * generalized lookup. Omitted -> found: false (fail safe, same as
+   * lookupCompanyRatio).
+   */
+  lookupVerdict?: (symbol: string) => Promise<VerdictDetail>;
 }
 
 const purificationBodySchema = z.object({
@@ -134,6 +167,42 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   app.get("/companies", async () => {
     const companies = opts.listCompanies ? await opts.listCompanies() : [];
     return { companies };
+  });
+
+  /**
+   * Full ratio breakdown for one company — the "why" behind its badge:
+   * every computed ratio, its threshold-pass state, and the machine-
+   * readable reason codes from the verdict combiner (Phase 9).
+   */
+  app.get("/companies/:symbol/verdict", async (request, reply) => {
+    const paramsResult = z.object({ symbol: z.string().min(1) }).safeParse(request.params);
+    if (!paramsResult.success) {
+      reply.status(400);
+      return { error: "symbol path parameter is required" };
+    }
+
+    const symbol = paramsResult.data.symbol.toUpperCase();
+    const detail: VerdictDetail = opts.lookupVerdict
+      ? await opts.lookupVerdict(symbol)
+      : {
+          found: false,
+          status: null,
+          businessActivityPass: null,
+          marketCap: null,
+          debtRatio: null,
+          cashRatio: null,
+          receivablesRatio: null,
+          nonCompliantIncomeRatio: null,
+          reasons: [],
+          computedAt: null,
+        };
+
+    if (!detail.found) {
+      reply.status(404);
+      return { error: `unknown symbol: ${symbol}` };
+    }
+
+    return { symbol, ...detail };
   });
 
   /**

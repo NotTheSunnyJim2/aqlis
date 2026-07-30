@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { fetchCompanies, type CompanySummary } from "../lib/api.js";
 import { ComplianceBadge } from "./ComplianceBadge.js";
 
-export function StockList() {
+interface StockListProps {
+  selectedSymbol: string | null;
+  onSelect: (symbol: string) => void;
+}
+
+export function StockList({ selectedSymbol, onSelect }: StockListProps) {
   const [companies, setCompanies] = useState<CompanySummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +45,13 @@ export function StockList() {
         {companies.map((company) => (
           <tr
             key={company.symbol}
-            className="border-b border-slate-100 dark:border-slate-800"
+            onClick={() => {
+              onSelect(company.symbol);
+            }}
+            aria-selected={company.symbol === selectedSymbol}
+            className={`cursor-pointer border-b border-slate-100 hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-800 ${
+              company.symbol === selectedSymbol ? "bg-slate-100 dark:bg-slate-800" : ""
+            }`}
           >
             <td className="py-2 pr-4 font-mono font-medium text-slate-900 dark:text-slate-100">
               {company.symbol}

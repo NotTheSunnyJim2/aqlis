@@ -116,6 +116,41 @@ const app = await buildApp({
       nonCompliantIncomeRatio: decimalToNumber(verdict?.nonCompliantIncomeRatio),
     };
   },
+  lookupVerdict: async (symbol) => {
+    const company = await prisma.company.findUnique({ where: { symbol }, select: { id: true } });
+    if (!company) {
+      return {
+        found: false,
+        status: null,
+        businessActivityPass: null,
+        marketCap: null,
+        debtRatio: null,
+        cashRatio: null,
+        receivablesRatio: null,
+        nonCompliantIncomeRatio: null,
+        reasons: [],
+        computedAt: null,
+      };
+    }
+    const verdict = await prisma.complianceVerdict.findFirst({
+      where: { companyId: company.id },
+      orderBy: { computedAt: "desc" },
+    });
+    return {
+      found: true,
+      status: verdict?.status ?? null,
+      businessActivityPass: verdict?.businessActivityPass ?? null,
+      // .toString() on the Decimal directly — same precision reasoning
+      // as latestPrice in listCompanies above.
+      marketCap: verdict?.marketCap ? verdict.marketCap.toString() : null,
+      debtRatio: decimalToNumber(verdict?.debtRatio),
+      cashRatio: decimalToNumber(verdict?.cashRatio),
+      receivablesRatio: decimalToNumber(verdict?.receivablesRatio),
+      nonCompliantIncomeRatio: decimalToNumber(verdict?.nonCompliantIncomeRatio),
+      reasons: verdict?.reasons ?? [],
+      computedAt: verdict?.computedAt.toISOString() ?? null,
+    };
+  },
 });
 
 const port = Number(process.env.PORT ?? 3000);
