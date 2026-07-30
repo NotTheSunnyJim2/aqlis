@@ -10,6 +10,7 @@
     "worker:consumer": "tsx src/workers/consumer-worker.ts",
     "db:seed": "prisma db seed",
     "generate": "prisma generate",
+    "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"
