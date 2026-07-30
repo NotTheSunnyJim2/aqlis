@@ -24,11 +24,14 @@ export default defineConfig({
       // Dev-only convenience: same-origin fetches to the API server,
       // avoiding CORS entirely rather than configuring it (Fly.io
       // deploy will actually serve both from one origin — see ADR
-      // when we reach Phase 17). WebSocket upgrades need ws: true.
+      // when we reach Phase 17). No path rewrite: the server itself
+      // now registers these routes under /api (app.ts), matching what
+      // the frontend already sends — so /api/companies forwards to
+      // /api/companies on :3000 unchanged, same route in dev and prod.
+      // WebSocket upgrades need ws: true.
       "/api": {
         target: "http://localhost:3000",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
       },
       "/ws": {
         target: "ws://localhost:3000",

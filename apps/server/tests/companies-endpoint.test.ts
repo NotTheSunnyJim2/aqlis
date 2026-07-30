@@ -30,7 +30,7 @@ describe("GET /companies", () => {
     app = await buildApp({ logger: false, listCompanies: () => Promise.resolve(companies) });
     await app.ready();
 
-    const res = await app.inject({ method: "GET", url: "/companies" });
+    const res = await app.inject({ method: "GET", url: "/api/companies" });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ companies });
@@ -40,7 +40,7 @@ describe("GET /companies", () => {
     app = await buildApp({ logger: false });
     await app.ready();
 
-    const res = await app.inject({ method: "GET", url: "/companies" });
+    const res = await app.inject({ method: "GET", url: "/api/companies" });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ companies: [] });
@@ -53,7 +53,7 @@ describe("GET /companies", () => {
     app = await buildApp({ logger: false, listCompanies: () => Promise.resolve(companies) });
     await app.ready();
 
-    const res = await app.inject({ method: "GET", url: "/companies" });
+    const res = await app.inject({ method: "GET", url: "/api/companies" });
 
     expect(res.json()).toEqual({ companies });
   });

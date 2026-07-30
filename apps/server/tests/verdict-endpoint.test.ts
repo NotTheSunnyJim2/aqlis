@@ -27,7 +27,7 @@ describe("GET /companies/:symbol/verdict", () => {
     app = await buildApp({ logger: false, lookupVerdict: () => Promise.resolve(tDetail) });
     await app.ready();
 
-    const res = await app.inject({ method: "GET", url: "/companies/T/verdict" });
+    const res = await app.inject({ method: "GET", url: "/api/companies/T/verdict" });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ symbol: "T", ...tDetail });
@@ -37,7 +37,7 @@ describe("GET /companies/:symbol/verdict", () => {
     app = await buildApp({ logger: false, lookupVerdict: () => Promise.resolve(tDetail) });
     await app.ready();
 
-    const res = await app.inject({ method: "GET", url: "/companies/t/verdict" });
+    const res = await app.inject({ method: "GET", url: "/api/companies/t/verdict" });
 
     expect(res.json()).toMatchObject({ symbol: "T" });
   });
@@ -61,7 +61,7 @@ describe("GET /companies/:symbol/verdict", () => {
     });
     await app.ready();
 
-    const res = await app.inject({ method: "GET", url: "/companies/ZZZZ/verdict" });
+    const res = await app.inject({ method: "GET", url: "/api/companies/ZZZZ/verdict" });
 
     expect(res.statusCode).toBe(404);
   });
@@ -70,7 +70,7 @@ describe("GET /companies/:symbol/verdict", () => {
     app = await buildApp({ logger: false });
     await app.ready();
 
-    const res = await app.inject({ method: "GET", url: "/companies/AAPL/verdict" });
+    const res = await app.inject({ method: "GET", url: "/api/companies/AAPL/verdict" });
 
     expect(res.statusCode).toBe(404);
   });
