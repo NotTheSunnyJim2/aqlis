@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyWebsocket from "@fastify/websocket";
+import fastifyStatic from "@fastify/static";
 import { z } from "zod";
 import { calculatePurification } from "./screening/purification.js";
 import { ConnectionHub } from "./realtime/connection-hub.js";
@@ -90,6 +91,16 @@ export interface BuildAppOptions {
    * lookupCompanyRatio).
    */
   lookupVerdict?: (symbol: string) => Promise<VerdictDetail>;
+  /**
+   * Absolute path to the built frontend (apps/web/dist), serving it as
+   * static files from this SAME Fastify server — production only. Omit
+   * in dev (Vite's own dev server handles the frontend there via its
+   * proxy, see apps/web/vite.config.ts) and in tests (nothing to
+   * serve). Same-origin serving is also why CORS never needed
+   * configuring: browser, API, and static assets all share one origin
+   * in production, just as they do via the dev proxy locally.
+   */
+  staticRoot?: string;
 }
 
 const purificationBodySchema = z.object({
@@ -116,6 +127,14 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   });
 
   await app.register(fastifyWebsocket);
+
+  if (opts.staticRoot) {
+    // Fastify's router matches exact paths (like /health, /companies)
+    // ahead of this plugin's file-serving regardless of registration
+    // order — it's a trie-based router, not first-match middleware —
+    // so there's no risk of shadowing the API routes declared below.
+    await app.register(fastifyStatic, { root: opts.staticRoot });
+  }
 
   // Own the hub's heartbeat lifecycle only when WE created it —
   // an injected hub is owned (started/stopped) by whoever constructed

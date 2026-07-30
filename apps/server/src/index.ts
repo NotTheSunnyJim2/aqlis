@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { Redis } from "ioredis";
 import pino from "pino";
 import { buildApp } from "./app.js";
@@ -42,8 +44,22 @@ subscriber.on("message", (_channel, message) => {
   }
 });
 
+// `public/` is a sibling of src/ and dist/ (see app.ts's staticRoot
+// comment) — so this resolves correctly whether this file is running
+// as src/index.ts (tsx, dev) or dist/index.js (node, production).
+// Existence-checked rather than env-gated: in dev nothing's built
+// there (Vite's own dev server handles the frontend), in production
+// the Docker build always populates it — one check covers both.
+const staticRoot = path.join(import.meta.dirname, "../public");
+const hasStaticBuild = existsSync(staticRoot);
+logger.info(
+  { staticRoot, hasStaticBuild },
+  hasStaticBuild ? "serving built frontend from this server" : "no built frontend found — API only",
+);
+
 const app = await buildApp({
   connectionHub,
+  staticRoot: hasStaticBuild ? staticRoot : undefined,
   logger:
     process.env.NODE_ENV === "production"
       ? true // raw JSON lines: logs are data in production
