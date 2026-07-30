@@ -17,7 +17,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* Strictness — matches tsconfig.app.json; now covers e2e test logic
+       too, not just vite.config.ts. */
+    "strict": true,
+    "noUncheckedIndexedAccess": true
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "playwright.config.ts", "e2e"]
 }

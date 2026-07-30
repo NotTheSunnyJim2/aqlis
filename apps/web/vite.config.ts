@@ -12,6 +12,12 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
+    // Explicit, not Vitest's broad default glob: without this, Vitest
+    // would ALSO try to run e2e/dashboard.spec.ts (matches the default
+    // *.spec.ts pattern) as one of its own tests — it imports from
+    // @playwright/test, not vitest, so that fails confusingly. Scoping
+    // to tests/ makes the unit-vs-e2e boundary unambiguous.
+    include: ["tests/**/*.test.{ts,tsx}"],
   },
   server: {
     proxy: {

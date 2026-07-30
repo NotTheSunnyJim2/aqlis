@@ -30,7 +30,10 @@ export function PurificationCalculator({ symbol }: { symbol: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+    <div
+      data-testid="purification-calculator"
+      className="rounded-lg border border-slate-200 p-4 dark:border-slate-700"
+    >
       <h2 className="mb-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
         Purification calculator — {symbol}
       </h2>

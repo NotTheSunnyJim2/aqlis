@@ -45,6 +45,7 @@ export function StockList({ selectedSymbol, onSelect }: StockListProps) {
         {companies.map((company) => (
           <tr
             key={company.symbol}
+            data-testid={`stock-row-${company.symbol}`}
             onClick={() => {
               onSelect(company.symbol);
             }}

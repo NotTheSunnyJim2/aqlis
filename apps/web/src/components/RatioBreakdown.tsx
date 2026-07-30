@@ -84,7 +84,10 @@ export function RatioBreakdown({ symbol }: { symbol: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+    <div
+      data-testid="ratio-breakdown"
+      className="rounded-lg border border-slate-200 p-4 dark:border-slate-700"
+    >
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{symbol}</h2>
         <ComplianceBadge status={detail.status} />

@@ -75,8 +75,23 @@ locally.
 
 ## How to test
 
-> Test harness arrives with the scaffold; suites grow alongside each feature.
-
 ```bash
 npm test
+```
+
+Runs the full unit/integration suite (Vitest) across both workspaces — this
+is what CI runs on every push, and it needs no real infrastructure or
+secrets: every I/O boundary (Postgres, Redis, external APIs, WebSockets) is
+exercised through structural fakes.
+
+There's also one Playwright end-to-end flow (`apps/web/e2e/`) that drives a
+real browser against the real stack — real Postgres, real Redis, the actual
+built frontend. It's intentionally **not** wired into CI: running it there
+would mean putting real Neon/Upstash credentials into GitHub Actions
+secrets, a decision deliberately deferred until Phase 17 (deploy), where
+it becomes unavoidable anyway. Run it locally:
+
+```bash
+npx playwright install chromium   # once
+npm run test:e2e -w @aqlis/web    # auto-starts both servers, runs the flow, tears them down
 ```
