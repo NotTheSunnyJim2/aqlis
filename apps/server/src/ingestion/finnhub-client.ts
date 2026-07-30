@@ -20,6 +20,13 @@ export interface FinnhubPriceClientOptions {
   heartbeatIntervalMs?: number;
   backoffBaseMs?: number;
   backoffMaxMs?: number;
+  /** Injectable WebSocket constructor, defaulting to the real `ws`
+   * library — same DI pattern as apps/web's useRealtimeEvents. Reconnect
+   * and heartbeat timing tests use a structural fake here instead of
+   * mixing fake timers with genuinely async real socket I/O, which
+   * fake timers can't control (they own setTimeout/setInterval, not
+   * when a real socket actually emits an event). */
+  WebSocketImpl?: typeof WebSocket;
 }
 
 /**
@@ -56,7 +63,8 @@ export class FinnhubPriceClient {
 
   private connect(): void {
     const base = this.options.url ?? DEFAULT_URL;
-    const ws = new WebSocket(`${base}?token=${this.options.apiKey}`);
+    const Impl = this.options.WebSocketImpl ?? WebSocket;
+    const ws = new Impl(`${base}?token=${this.options.apiKey}`);
     this.ws = ws;
 
     ws.on("open", () => {
