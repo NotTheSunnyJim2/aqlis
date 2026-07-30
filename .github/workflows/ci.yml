@@ -31,3 +31,12 @@ jobs:
       - run: npm run typecheck
 
       - run: npm test
+
+      # Last, not first: bundling is the most expensive step, and
+      # lint/typecheck/test already catch most real bugs faster and
+      # cheaper — same fail-fast ordering as the rest of this pipeline.
+      # Only apps/web has a real build script today; apps/server's
+      # production build is deliberately deferred to the Docker phase
+      # (Phase 17) — see ADR/deferred item ⑥, nothing to verify yet
+      # without emit config that nothing consumes.
+      - run: npm run build
