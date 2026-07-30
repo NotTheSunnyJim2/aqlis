@@ -3,7 +3,9 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { Redis } from "ioredis";
 import pino from "pino";
-import { buildApp } from "./app.js";
+import { buildApp, type PortfolioComparisonCache } from "./app.js";
+import { FmpHistoricalClient } from "./analytics/fmp-historical-client.js";
+import { buildPortfolioComparison } from "./analytics/portfolio-comparison.js";
 import { loadConfig } from "./config.js";
 import { createPrismaClient } from "./db.js";
 import { decimalToNumber } from "./decimal.js";
@@ -57,8 +59,83 @@ logger.info(
   hasStaticBuild ? "serving built frontend from this server" : "no built frontend found — API only",
 );
 
+// Monte Carlo portfolio comparison (Phase 20): recomputed on a
+// background timer, never inside a request handler — the simulation
+// is CPU-bound (measured: ~500ms combined for both portfolios at 1000
+// simulations each) and would stall every concurrent request and
+// WebSocket heartbeat if it ran synchronously mid-request. 12h refresh
+// interval: the underlying data is daily closes, so anything faster
+// than "once a day" buys no real freshness, and this keeps FMP's
+// historical-price-eod calls (one per watchlist symbol per refresh)
+// far under the free-tier 250/day cap.
+const MONTE_CARLO_HORIZON_DAYS = 252; // 1 year
+const MONTE_CARLO_NUM_SIMULATIONS = 1000;
+const MONTE_CARLO_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
+
+const fmpHistoricalClient = new FmpHistoricalClient(config.fmpApiKey);
+let portfolioComparisonCache: PortfolioComparisonCache | null = null;
+
+async function refreshPortfolioComparison(): Promise<void> {
+  try {
+    const companies = await prisma.company.findMany({
+      where: { isActive: true },
+      select: {
+        symbol: true,
+        complianceVerdicts: { take: 1, orderBy: { computedAt: "desc" }, select: { status: true } },
+      },
+    });
+
+    const conventionalSymbols = companies.map((c) => c.symbol);
+    const halalSymbols = companies
+      .filter((c) => c.complianceVerdicts[0]?.status === "COMPLIANT")
+      .map((c) => c.symbol);
+
+    const histories = await Promise.all(
+      conventionalSymbols.map(async (symbol) => ({
+        symbol,
+        closes: await fmpHistoricalClient.fetchDailyCloses(symbol),
+      })),
+    );
+
+    const { halal, conventional } = buildPortfolioComparison({
+      halalSymbols,
+      conventionalSymbols,
+      histories,
+      horizonDays: MONTE_CARLO_HORIZON_DAYS,
+      numSimulations: MONTE_CARLO_NUM_SIMULATIONS,
+    });
+
+    portfolioComparisonCache = {
+      halalSymbols,
+      conventionalSymbols,
+      halal,
+      conventional,
+      computedAt: new Date().toISOString(),
+    };
+    logger.info(
+      { halalCount: halalSymbols.length, conventionalCount: conventionalSymbols.length },
+      "portfolio comparison refreshed",
+    );
+  } catch (err) {
+    // Never let a bad refresh crash the process or wipe a previously
+    // good cache — the endpoint just keeps serving the last successful
+    // result (or 503, if there's never been one) until the next timer.
+    logger.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      "portfolio comparison refresh failed",
+    );
+  }
+}
+
+void refreshPortfolioComparison(); // warm the cache without blocking startup
+const portfolioComparisonInterval = setInterval(
+  () => void refreshPortfolioComparison(),
+  MONTE_CARLO_REFRESH_INTERVAL_MS,
+);
+
 const app = await buildApp({
   connectionHub,
+  getPortfolioComparison: () => portfolioComparisonCache,
   staticRoot: hasStaticBuild ? staticRoot : undefined,
   logger:
     process.env.NODE_ENV === "production"
@@ -184,6 +261,7 @@ try {
 async function shutdown(signal: string): Promise<void> {
   app.log.info({ signal }, "shutting down");
   connectionHub.stopHeartbeat();
+  clearInterval(portfolioComparisonInterval);
   await app.close();
   await prisma.$disconnect();
   redis.disconnect();

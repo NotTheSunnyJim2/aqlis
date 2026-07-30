@@ -4,6 +4,7 @@ import fastifyStatic from "@fastify/static";
 import { z } from "zod";
 import { calculatePurification } from "./screening/purification.js";
 import { ConnectionHub } from "./realtime/connection-hub.js";
+import type { PathSummary } from "./analytics/monte-carlo.js";
 
 export interface CompanyRatioLookup {
   found: boolean;
@@ -43,6 +44,14 @@ export interface CompanySummary {
   latestPrice: string | null;
   /** ISO 8601, null if no verdict has ever been computed. */
   computedAt: string | null;
+}
+
+export interface PortfolioComparisonCache {
+  halalSymbols: string[];
+  conventionalSymbols: string[];
+  halal: PathSummary;
+  conventional: PathSummary;
+  computedAt: string;
 }
 
 export interface BuildAppOptions {
@@ -91,6 +100,17 @@ export interface BuildAppOptions {
    * lookupCompanyRatio).
    */
   lookupVerdict?: (symbol: string) => Promise<VerdictDetail>;
+  /**
+   * Reads the current cached halal-vs-conventional Monte Carlo
+   * comparison (Phase 20) — NEVER computes it inline. The simulation is
+   * CPU-bound (hundreds of ms, measured) and would block the event
+   * loop, stalling every concurrent request and WebSocket heartbeat if
+   * run inside a request handler; index.ts recomputes it on a
+   * background timer instead, and this just reads whatever's cached.
+   * Omitted -> found: false (503) — fail safe, same pattern as every
+   * other optional dependency here.
+   */
+  getPortfolioComparison?: () => PortfolioComparisonCache | null;
   /**
    * Absolute path to the built frontend (apps/web/dist), serving it as
    * static files from this SAME Fastify server — production only. Omit
@@ -277,6 +297,25 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
       });
 
       return { symbol, ...result };
+    });
+
+    /**
+     * Halal vs conventional portfolio comparison (Phase 20, optional
+     * stretch goal) — correlated Monte Carlo simulation over both
+     * portfolios' real historical drift/volatility. Always reads a
+     * background-refreshed cache (see BuildAppOptions.getPortfolioComparison's
+     * comment for why this never computes inline). 503, not 404: this
+     * isn't "unknown symbol," it's "the feature isn't available yet"
+     * (e.g. right after startup, before the first background refresh
+     * completes).
+     */
+    api.get("/monte-carlo", (_request, reply) => {
+      const cache = opts.getPortfolioComparison?.() ?? null;
+      if (!cache) {
+        reply.status(503);
+        return { error: "portfolio comparison not yet available" };
+      }
+      return cache;
     });
   }, { prefix: "/api" });
 
