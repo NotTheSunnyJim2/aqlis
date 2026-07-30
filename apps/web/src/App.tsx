@@ -3,6 +3,7 @@ import { StockList } from "./components/StockList.js";
 import { RatioBreakdown } from "./components/RatioBreakdown.js";
 import { DriftAlertFeed } from "./components/DriftAlertFeed.js";
 import { PurificationCalculator } from "./components/PurificationCalculator.js";
+import { PortfolioComparison } from "./components/PortfolioComparison.js";
 
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -22,6 +23,9 @@ function App() {
         )}
         <div className="mt-6">
           <DriftAlertFeed />
+        </div>
+        <div className="mt-6">
+          <PortfolioComparison />
         </div>
       </div>
     </main>

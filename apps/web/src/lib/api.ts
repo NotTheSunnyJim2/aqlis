@@ -74,3 +74,32 @@ export async function calculatePurification(
   }
   return (await res.json()) as PurificationResult;
 }
+
+export interface PathSummary {
+  percentilesByDay: Array<{ day: number; p5: number; p25: number; p50: number; p75: number; p95: number }>;
+  finalValue: { mean: number; stdev: number; p5: number; p50: number; p95: number; probabilityOfLoss: number };
+}
+
+export interface PortfolioComparison {
+  halalSymbols: string[];
+  conventionalSymbols: string[];
+  halal: PathSummary;
+  conventional: PathSummary;
+  computedAt: string;
+}
+
+/**
+ * Returns null for a 503 (Phase 20's background-refreshed simulation
+ * cache not warm yet, e.g. right after server startup) rather than
+ * throwing — routine and expected, not an error worth surfacing as one.
+ */
+export async function fetchPortfolioComparison(): Promise<PortfolioComparison | null> {
+  const res = await fetch("/api/monte-carlo");
+  if (res.status === 503) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`Failed to fetch portfolio comparison: HTTP ${res.status}`);
+  }
+  return (await res.json()) as PortfolioComparison;
+}
