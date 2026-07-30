@@ -18,7 +18,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   ADULT_ENTERTAINMENT: "Adult entertainment",
 };
 
-const RATIO_LABELS: Record<string, string> = {
+/** Exported for reuse by the drift alert feed (Phase 13's third
+ * feature) — same four ratio names, same friendly labels, one table. */
+export const RATIO_LABELS: Record<string, string> = {
   DEBT: "Debt ratio",
   CASH: "Cash & interest-bearing securities ratio",
   RECEIVABLES: "Receivables ratio",

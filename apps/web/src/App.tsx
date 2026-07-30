@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { StockList } from "./components/StockList.js";
 import { RatioBreakdown } from "./components/RatioBreakdown.js";
+import { DriftAlertFeed } from "./components/DriftAlertFeed.js";
 
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -17,6 +18,9 @@ function App() {
             <RatioBreakdown key={selectedSymbol} symbol={selectedSymbol} />
           </div>
         )}
+        <div className="mt-6">
+          <DriftAlertFeed />
+        </div>
       </div>
     </main>
   );
