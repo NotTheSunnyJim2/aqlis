@@ -9,6 +9,19 @@ export interface CompanyRatioLookup {
   nonCompliantIncomeRatio: number | null;
 }
 
+export interface CompanySummary {
+  symbol: string;
+  name: string;
+  /** null = no verdict computed yet (e.g. before the first worker run),
+   * NOT the same as a computed UNKNOWN verdict — see verdict.ts. */
+  status: "COMPLIANT" | "NON_COMPLIANT" | "UNKNOWN" | null;
+  /** Kept as a string — same precision reasoning as the ingestion
+   * pipeline (see consumers/price-entry.ts); null if no price yet. */
+  latestPrice: string | null;
+  /** ISO 8601, null if no verdict has ever been computed. */
+  computedAt: string | null;
+}
+
 export interface BuildAppOptions {
   /** Fastify logger config; tests pass `false` to keep output clean. */
   logger?: boolean | object;
@@ -39,6 +52,11 @@ export interface BuildAppOptions {
    * managed internally — fine for tests that don't touch /ws.
    */
   connectionHub?: ConnectionHub;
+  /** Lists the watchlist with each company's latest verdict/price for
+   * the dashboard's stock list. Injected for the same reason as
+   * everything else here — app.ts never touches Prisma directly.
+   * Omitted -> empty list (fails to "nothing to show", not fake data). */
+  listCompanies?: () => Promise<CompanySummary[]>;
 }
 
 const purificationBodySchema = z.object({
@@ -107,6 +125,15 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
       status: ready ? ("ready" as const) : ("not ready" as const),
       checks: { database: databaseOk, redis: redisOk },
     };
+  });
+
+  /**
+   * The watchlist, each with its latest compliance status and price —
+   * what the dashboard's stock list renders as badges.
+   */
+  app.get("/companies", async () => {
+    const companies = opts.listCompanies ? await opts.listCompanies() : [];
+    return { companies };
   });
 
   /**

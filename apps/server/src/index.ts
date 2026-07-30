@@ -63,6 +63,44 @@ const app = await buildApp({
       return false;
     }
   },
+  listCompanies: async () => {
+    // A single query: `take: 1, orderBy` on each relation asks Prisma
+    // for each company's LATEST verdict and LATEST price snapshot
+    // directly — not an N+1 loop of separate findFirst calls.
+    const companies = await prisma.company.findMany({
+      where: { isActive: true },
+      orderBy: { symbol: "asc" },
+      select: {
+        symbol: true,
+        name: true,
+        complianceVerdicts: {
+          take: 1,
+          orderBy: { computedAt: "desc" },
+          select: { status: true, computedAt: true },
+        },
+        priceSnapshots: {
+          take: 1,
+          orderBy: { observedAt: "desc" },
+          select: { price: true },
+        },
+      },
+    });
+
+    return companies.map((company) => {
+      const verdict = company.complianceVerdicts[0];
+      const price = company.priceSnapshots[0];
+      return {
+        symbol: company.symbol,
+        name: company.name,
+        status: verdict?.status ?? null,
+        // .toString() directly on the Decimal — NOT via decimalToNumber,
+        // which would round-trip through a lossy float64 for no reason
+        // (same precision discipline as the ingestion pipeline).
+        latestPrice: price ? price.price.toString() : null,
+        computedAt: verdict?.computedAt.toISOString() ?? null,
+      };
+    });
+  },
   lookupCompanyRatio: async (symbol) => {
     const company = await prisma.company.findUnique({ where: { symbol }, select: { id: true } });
     if (!company) {
