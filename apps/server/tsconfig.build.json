@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  // Ship only what production actually runs: never test files, and
+  // never prisma.config.ts/seed.ts — those are dev-time tooling
+  // (migrations, seeding) invoked via `npx prisma`, not imported by
+  // the running app.
+  "exclude": ["tests", "prisma.config.ts", "prisma/seed.ts"]
+}
