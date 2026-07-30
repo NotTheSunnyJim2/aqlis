@@ -10,6 +10,9 @@ node_modules/
 
 # Build output
 dist/
+# apps/server/public: the built frontend, copied in by the Docker build
+# (or manually for local verification) — never a source directory.
+apps/server/public/
 
 # Test artifacts
 coverage/

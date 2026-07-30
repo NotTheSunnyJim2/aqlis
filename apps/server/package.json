@@ -30,6 +30,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@fastify/static": "^10.1.2",
     "@fastify/websocket": "^11.3.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.8.0",
