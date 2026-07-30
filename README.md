@@ -84,6 +84,9 @@ Every non-trivial choice has an Architecture Decision Record in
   — why Terraform was dropped mid-project, and what replaced it
 - [ADR-004: one Redis, two messaging patterns](docs/adr/004-redis-dual-use.md)
   — Streams for ingestion, Pub/Sub for live fan-out, same instance
+- [ADR-005: Monte Carlo portfolio comparison](docs/adr/005-monte-carlo-portfolio-comparison.md)
+  — correlated GBM over real historical data, and why it never runs
+  inside a request handler
 
 ## How to run
 
