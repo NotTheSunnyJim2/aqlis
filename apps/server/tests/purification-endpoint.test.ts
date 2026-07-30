@@ -20,7 +20,7 @@ describe("POST /companies/:symbol/purification", () => {
 
     const res = await app.inject({
       method: "POST",
-      url: "/companies/AAPL/purification",
+      url: "/api/companies/AAPL/purification",
       payload: { dividendReceived: 500 },
     });
 
@@ -44,7 +44,7 @@ describe("POST /companies/:symbol/purification", () => {
 
     const res = await app.inject({
       method: "POST",
-      url: "/companies/aapl/purification",
+      url: "/api/companies/aapl/purification",
       payload: { dividendReceived: 100 },
     });
 
@@ -61,7 +61,7 @@ describe("POST /companies/:symbol/purification", () => {
 
     const res = await app.inject({
       method: "POST",
-      url: "/companies/ZZZZ/purification",
+      url: "/api/companies/ZZZZ/purification",
       payload: { dividendReceived: 100 },
     });
 
@@ -74,7 +74,7 @@ describe("POST /companies/:symbol/purification", () => {
 
     const res = await app.inject({
       method: "POST",
-      url: "/companies/AAPL/purification",
+      url: "/api/companies/AAPL/purification",
       payload: { dividendReceived: 100 },
     });
 
@@ -91,7 +91,7 @@ describe("POST /companies/:symbol/purification", () => {
 
     const res = await app.inject({
       method: "POST",
-      url: "/companies/AAPL/purification",
+      url: "/api/companies/AAPL/purification",
       payload: { dividendReceived: 500 },
     });
 
@@ -109,7 +109,7 @@ describe("POST /companies/:symbol/purification", () => {
 
     const res = await app.inject({
       method: "POST",
-      url: "/companies/AAPL/purification",
+      url: "/api/companies/AAPL/purification",
       payload: { dividendReceived: -50 },
     });
 
@@ -122,7 +122,7 @@ describe("POST /companies/:symbol/purification", () => {
 
     const res = await app.inject({
       method: "POST",
-      url: "/companies/AAPL/purification",
+      url: "/api/companies/AAPL/purification",
       payload: {},
     });
 

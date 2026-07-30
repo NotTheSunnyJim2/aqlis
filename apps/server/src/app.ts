@@ -180,91 +180,105 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   });
 
   /**
-   * The watchlist, each with its latest compliance status and price —
-   * what the dashboard's stock list renders as badges.
+   * Data routes live under /api — NOT /health or /ws, which stay at
+   * root (see below). The frontend's fetch calls are hardcoded to
+   * `/api/...` (apps/web/src/lib/api.ts); in dev, Vite's proxy strips
+   * that prefix on the way to this server, creating the illusion these
+   * routes live at root. In production there's no proxy — this server
+   * IS the same origin serving both the static frontend and the API —
+   * so the prefix has to actually exist here, or those fetches 404
+   * against Fastify's real route table. Fly's health checks and the
+   * WebSocket upgrade hit /health and /ws directly (no frontend fetch
+   * involved), so they're registered outside this prefixed group.
    */
-  app.get("/companies", async () => {
-    const companies = opts.listCompanies ? await opts.listCompanies() : [];
-    return { companies };
-  });
-
-  /**
-   * Full ratio breakdown for one company — the "why" behind its badge:
-   * every computed ratio, its threshold-pass state, and the machine-
-   * readable reason codes from the verdict combiner (Phase 9).
-   */
-  app.get("/companies/:symbol/verdict", async (request, reply) => {
-    const paramsResult = z.object({ symbol: z.string().min(1) }).safeParse(request.params);
-    if (!paramsResult.success) {
-      reply.status(400);
-      return { error: "symbol path parameter is required" };
-    }
-
-    const symbol = paramsResult.data.symbol.toUpperCase();
-    const detail: VerdictDetail = opts.lookupVerdict
-      ? await opts.lookupVerdict(symbol)
-      : {
-          found: false,
-          status: null,
-          businessActivityPass: null,
-          marketCap: null,
-          debtRatio: null,
-          cashRatio: null,
-          receivablesRatio: null,
-          nonCompliantIncomeRatio: null,
-          reasons: [],
-          computedAt: null,
-        };
-
-    if (!detail.found) {
-      reply.status(404);
-      return { error: `unknown symbol: ${symbol}` };
-    }
-
-    return { symbol, ...detail };
-  });
-
-  /**
-   * Income purification — NOT zakat (see purification.ts / README for
-   * the distinction). Given a dividend amount, returns how much of it
-   * should be donated based on the company's current non-compliant
-   * income ratio (Phase 9).
-   */
-  app.post("/companies/:symbol/purification", async (request, reply) => {
-    const paramsResult = z.object({ symbol: z.string().min(1) }).safeParse(request.params);
-    if (!paramsResult.success) {
-      reply.status(400);
-      return { error: "symbol path parameter is required" };
-    }
-
-    const bodyResult = purificationBodySchema.safeParse(request.body);
-    if (!bodyResult.success) {
-      reply.status(400);
-      return {
-        error: "invalid request body",
-        issues: bodyResult.error.issues.map((issue) => issue.message),
-      };
-    }
-
-    const symbol = paramsResult.data.symbol.toUpperCase();
-    // No injected lookup -> fail safe: treat every symbol as unknown
-    // rather than silently pretending it exists.
-    const lookup = opts.lookupCompanyRatio
-      ? await opts.lookupCompanyRatio(symbol)
-      : { found: false, nonCompliantIncomeRatio: null };
-
-    if (!lookup.found) {
-      reply.status(404);
-      return { error: `unknown symbol: ${symbol}` };
-    }
-
-    const result = calculatePurification({
-      dividendReceived: bodyResult.data.dividendReceived,
-      nonCompliantIncomeRatio: lookup.nonCompliantIncomeRatio,
+  await app.register((api) => {
+    /**
+     * The watchlist, each with its latest compliance status and price —
+     * what the dashboard's stock list renders as badges.
+     */
+    api.get("/companies", async () => {
+      const companies = opts.listCompanies ? await opts.listCompanies() : [];
+      return { companies };
     });
 
-    return { symbol, ...result };
-  });
+    /**
+     * Full ratio breakdown for one company — the "why" behind its badge:
+     * every computed ratio, its threshold-pass state, and the machine-
+     * readable reason codes from the verdict combiner (Phase 9).
+     */
+    api.get("/companies/:symbol/verdict", async (request, reply) => {
+      const paramsResult = z.object({ symbol: z.string().min(1) }).safeParse(request.params);
+      if (!paramsResult.success) {
+        reply.status(400);
+        return { error: "symbol path parameter is required" };
+      }
+
+      const symbol = paramsResult.data.symbol.toUpperCase();
+      const detail: VerdictDetail = opts.lookupVerdict
+        ? await opts.lookupVerdict(symbol)
+        : {
+            found: false,
+            status: null,
+            businessActivityPass: null,
+            marketCap: null,
+            debtRatio: null,
+            cashRatio: null,
+            receivablesRatio: null,
+            nonCompliantIncomeRatio: null,
+            reasons: [],
+            computedAt: null,
+          };
+
+      if (!detail.found) {
+        reply.status(404);
+        return { error: `unknown symbol: ${symbol}` };
+      }
+
+      return { symbol, ...detail };
+    });
+
+    /**
+     * Income purification — NOT zakat (see purification.ts / README for
+     * the distinction). Given a dividend amount, returns how much of it
+     * should be donated based on the company's current non-compliant
+     * income ratio (Phase 9).
+     */
+    api.post("/companies/:symbol/purification", async (request, reply) => {
+      const paramsResult = z.object({ symbol: z.string().min(1) }).safeParse(request.params);
+      if (!paramsResult.success) {
+        reply.status(400);
+        return { error: "symbol path parameter is required" };
+      }
+
+      const bodyResult = purificationBodySchema.safeParse(request.body);
+      if (!bodyResult.success) {
+        reply.status(400);
+        return {
+          error: "invalid request body",
+          issues: bodyResult.error.issues.map((issue) => issue.message),
+        };
+      }
+
+      const symbol = paramsResult.data.symbol.toUpperCase();
+      // No injected lookup -> fail safe: treat every symbol as unknown
+      // rather than silently pretending it exists.
+      const lookup = opts.lookupCompanyRatio
+        ? await opts.lookupCompanyRatio(symbol)
+        : { found: false, nonCompliantIncomeRatio: null };
+
+      if (!lookup.found) {
+        reply.status(404);
+        return { error: `unknown symbol: ${symbol}` };
+      }
+
+      const result = calculatePurification({
+        dividendReceived: bodyResult.data.dividendReceived,
+        nonCompliantIncomeRatio: lookup.nonCompliantIncomeRatio,
+      });
+
+      return { symbol, ...result };
+    });
+  }, { prefix: "/api" });
 
   /**
    * Live dashboard feed: prices and compliance drift alerts, pushed
