@@ -66,11 +66,12 @@ npm run dev                        # API server — http://localhost:3000
 npm run worker:price                # Finnhub -> Redis Stream
 npm run worker:fundamentals         # FMP -> Redis Stream
 npm run worker:consumer             # streams -> Postgres, computes verdicts
+npm run dev -w @aqlis/web           # dashboard — http://localhost:5173
 ```
 
-> The frontend dashboard is not yet built (Phase 13) — until then, the API
-> is reachable directly, e.g.
-> `curl -X POST localhost:3000/companies/AAPL/purification -d '{"dividendReceived":500}'`.
+The dashboard dev server proxies `/api` and `/ws` to the API server on
+`localhost:3000` (see `apps/web/vite.config.ts`) — no CORS setup needed
+locally.
 
 ## How to test
 
