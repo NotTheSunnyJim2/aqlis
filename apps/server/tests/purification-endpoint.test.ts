@@ -11,7 +11,7 @@ describe("POST /companies/:symbol/purification", () => {
   });
 
   it("computes purification for a known company with a known ratio", async () => {
-    app = buildApp({
+    app = await buildApp({
       logger: false,
       lookupCompanyRatio: (): Promise<CompanyRatioLookup> =>
         Promise.resolve({ found: true, nonCompliantIncomeRatio: 0.02 }),
@@ -35,7 +35,7 @@ describe("POST /companies/:symbol/purification", () => {
   });
 
   it("upper-cases the symbol from the URL", async () => {
-    app = buildApp({
+    app = await buildApp({
       logger: false,
       lookupCompanyRatio: (): Promise<CompanyRatioLookup> =>
         Promise.resolve({ found: true, nonCompliantIncomeRatio: 0 }),
@@ -52,7 +52,7 @@ describe("POST /companies/:symbol/purification", () => {
   });
 
   it("returns 404 for a symbol the lookup doesn't find", async () => {
-    app = buildApp({
+    app = await buildApp({
       logger: false,
       lookupCompanyRatio: (): Promise<CompanyRatioLookup> =>
         Promise.resolve({ found: false, nonCompliantIncomeRatio: null }),
@@ -69,7 +69,7 @@ describe("POST /companies/:symbol/purification", () => {
   });
 
   it("fails safe with 404 when no lookup is injected at all", async () => {
-    app = buildApp({ logger: false }); // no lookupCompanyRatio provided
+    app = await buildApp({ logger: false }); // no lookupCompanyRatio provided
     await app.ready();
 
     const res = await app.inject({
@@ -82,7 +82,7 @@ describe("POST /companies/:symbol/purification", () => {
   });
 
   it("returns a null purification amount when the ratio is unknown, not a false zero", async () => {
-    app = buildApp({
+    app = await buildApp({
       logger: false,
       lookupCompanyRatio: (): Promise<CompanyRatioLookup> =>
         Promise.resolve({ found: true, nonCompliantIncomeRatio: null }),
@@ -100,7 +100,7 @@ describe("POST /companies/:symbol/purification", () => {
   });
 
   it("returns 400 for a negative dividend amount", async () => {
-    app = buildApp({
+    app = await buildApp({
       logger: false,
       lookupCompanyRatio: (): Promise<CompanyRatioLookup> =>
         Promise.resolve({ found: true, nonCompliantIncomeRatio: 0.02 }),
@@ -117,7 +117,7 @@ describe("POST /companies/:symbol/purification", () => {
   });
 
   it("returns 400 for a missing dividendReceived field", async () => {
-    app = buildApp({ logger: false });
+    app = await buildApp({ logger: false });
     await app.ready();
 
     const res = await app.inject({

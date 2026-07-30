@@ -12,6 +12,7 @@ import { writeFundamentalsSnapshot } from "../consumers/fundamentals-writer.js";
 import { recordVerdict } from "../consumers/verdict-recorder.js";
 import { PRICES_STREAM_KEY } from "../ingestion/price-publisher.js";
 import { FUNDAMENTALS_STREAM_KEY } from "../ingestion/fundamentals-publisher.js";
+import { publishEvent } from "../realtime/publisher.js";
 
 /**
  * Consumer worker — the join point of the whole pipeline. Reads both
@@ -48,6 +49,31 @@ function main(): void {
   const prisma = createPrismaClient(config.databaseUrl);
   const registry = new CompanyRegistry(prisma);
 
+  /** Publishes every drift event recordVerdict detected — the API
+   * server's Redis subscriber (index.ts) fans these out to connected
+   * dashboard clients. A no-op when there's nothing new (unknown
+   * symbol, or a check that changed nothing). */
+  async function publishDriftEvents(
+    symbol: string,
+    result: Awaited<ReturnType<typeof recordVerdict>>,
+  ): Promise<void> {
+    if (!result) {
+      return;
+    }
+    for (const event of result.driftEvents) {
+      await publishEvent(redis, {
+        type: "drift",
+        symbol,
+        alertType: event.type,
+        ratio: event.ratio,
+        previousValue: event.previousValue,
+        currentValue: event.currentValue,
+        threshold: event.threshold,
+        status: result.status,
+      });
+    }
+  }
+
   const priceConsumer = new StreamConsumer({
     redis,
     streamKey: PRICES_STREAM_KEY,
@@ -65,7 +91,15 @@ function main(): void {
         return;
       }
       await writePriceSnapshot(prisma, companyId, entry);
-      await recordVerdict(prisma, registry, entry.symbol, logger);
+      await publishEvent(redis, {
+        type: "price",
+        symbol: entry.symbol,
+        price: entry.price,
+        observedAt: entry.observedAt.getTime().toString(),
+      });
+
+      const result = await recordVerdict(prisma, registry, entry.symbol, logger);
+      await publishDriftEvents(entry.symbol, result);
     },
   });
 
@@ -83,7 +117,8 @@ function main(): void {
         return;
       }
       await writeFundamentalsSnapshot(prisma, companyId, entry);
-      await recordVerdict(prisma, registry, entry.symbol, logger);
+      const result = await recordVerdict(prisma, registry, entry.symbol, logger);
+      await publishDriftEvents(entry.symbol, result);
     },
   });
 

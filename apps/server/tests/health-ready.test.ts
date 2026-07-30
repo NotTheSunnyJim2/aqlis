@@ -11,7 +11,7 @@ describe("GET /health/ready", () => {
   });
 
   it("is ready when both dependencies are healthy", async () => {
-    app = buildApp({
+    app = await buildApp({
       logger: false,
       checkDatabase: () => Promise.resolve(true),
       checkRedis: () => Promise.resolve(true),
@@ -28,7 +28,7 @@ describe("GET /health/ready", () => {
   });
 
   it("returns 503 and identifies the database as the failing check", async () => {
-    app = buildApp({
+    app = await buildApp({
       logger: false,
       checkDatabase: () => Promise.resolve(false),
       checkRedis: () => Promise.resolve(true),
@@ -45,7 +45,7 @@ describe("GET /health/ready", () => {
   });
 
   it("returns 503 and identifies redis as the failing check", async () => {
-    app = buildApp({
+    app = await buildApp({
       logger: false,
       checkDatabase: () => Promise.resolve(true),
       checkRedis: () => Promise.resolve(false),
@@ -59,7 +59,7 @@ describe("GET /health/ready", () => {
   });
 
   it("defaults to ready when no checks are injected (keeps liveness-only tests simple)", async () => {
-    app = buildApp({ logger: false });
+    app = await buildApp({ logger: false });
     await app.ready();
 
     const res = await app.inject({ method: "GET", url: "/health/ready" });

@@ -1,9 +1,18 @@
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CompanyRegistry } from "./company-registry.js";
 import type { Logger } from "../logger.js";
-import { computeVerdict } from "../screening/verdict.js";
-import { detectDrift, type DriftComparableVerdict } from "../screening/drift.js";
+import { computeVerdict, type VerdictStatus } from "../screening/verdict.js";
+import { detectDrift, type DriftComparableVerdict, type DriftEvent } from "../screening/drift.js";
 import { decimalToNumber } from "../decimal.js";
+
+export interface RecordVerdictResult {
+  status: VerdictStatus;
+  /** Drift events detected THIS call — empty for a company's
+   * first-ever verdict, or when nothing changed. The caller (the
+   * consumer worker) uses this to decide what to broadcast (Phase 12)
+   * without verdict-recorder needing to know Redis/realtime exist. */
+  driftEvents: DriftEvent[];
+}
 
 /**
  * Recomputes and persists a verdict for one company, using its LATEST
@@ -22,11 +31,11 @@ export async function recordVerdict(
   registry: CompanyRegistry,
   symbol: string,
   logger: Logger,
-): Promise<void> {
+): Promise<RecordVerdictResult | undefined> {
   const company = registry.get(symbol);
   if (!company) {
     logger.warn({ symbol }, "cannot record verdict — unknown symbol");
-    return;
+    return undefined;
   }
 
   const [latestPrice, latestFundamentals, previousVerdict] = await Promise.all([
@@ -114,4 +123,6 @@ export async function recordVerdict(
   }
 
   logger.info({ symbol, status: verdict.status }, "verdict recorded");
+
+  return { status: verdict.status, driftEvents: events };
 }

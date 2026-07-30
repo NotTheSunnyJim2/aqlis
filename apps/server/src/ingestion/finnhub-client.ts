@@ -1,25 +1,11 @@
 import WebSocket from "ws";
 import { parseTradeMessage, type FinnhubTrade } from "./finnhub-message.js";
 import type { Logger } from "../logger.js";
+import { rawDataToString } from "../ws-raw-data.js";
 
 export type { Logger };
 
 const DEFAULT_URL = "wss://ws.finnhub.io";
-
-/**
- * Decode a WebSocket frame to a UTF-8 string, handling every shape
- * `RawData` can take: a single Buffer, a fragmented Buffer[], or a raw
- * ArrayBuffer. A naive `.toString()` corrupts the latter two.
- */
-function rawDataToString(data: WebSocket.RawData): string {
-  if (Buffer.isBuffer(data)) {
-    return data.toString("utf8");
-  }
-  if (Array.isArray(data)) {
-    return Buffer.concat(data).toString("utf8");
-  }
-  return Buffer.from(data).toString("utf8");
-}
 const DEFAULT_HEARTBEAT_MS = 15_000;
 const DEFAULT_BACKOFF_BASE_MS = 1_000;
 const DEFAULT_BACKOFF_MAX_MS = 30_000;

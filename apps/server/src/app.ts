@@ -1,6 +1,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import fastifyWebsocket from "@fastify/websocket";
 import { z } from "zod";
 import { calculatePurification } from "./screening/purification.js";
+import { ConnectionHub } from "./realtime/connection-hub.js";
 
 export interface CompanyRatioLookup {
   found: boolean;
@@ -29,6 +31,14 @@ export interface BuildAppOptions {
    * would do here.
    */
   lookupCompanyRatio?: (symbol: string) => Promise<CompanyRatioLookup>;
+  /**
+   * The dashboard connection registry (Phase 12). Inject your OWN
+   * instance when a Redis Pub/Sub subscriber elsewhere (index.ts) needs
+   * to call `.broadcast()` on the exact same hub the /ws route adds
+   * clients to. If omitted, a private hub is created and its heartbeat
+   * managed internally — fine for tests that don't touch /ws.
+   */
+  connectionHub?: ConnectionHub;
 }
 
 const purificationBodySchema = z.object({
@@ -39,11 +49,30 @@ const purificationBodySchema = z.object({
  * Builds a fully-configured Fastify app WITHOUT starting it.
  * Construction and listening are separated so tests can exercise
  * routes in-process (app.inject) — no port, no network.
+ *
+ * ASYNC, and callers must `await` it: @fastify/websocket wraps route
+ * handlers via an `onRoute` hook that only sees routes declared AFTER
+ * the plugin's own setup has actually run. `register()` merely QUEUES
+ * a plugin for avvio's boot sequence — an un-awaited `void
+ * app.register(...)` lets subsequent synchronous route declarations
+ * race ahead of that boot, so the /ws route below would silently never
+ * get recognized as a websocket route (confirmed empirically: it fell
+ * through to a plain Request/Reply handler instead of a WebSocket).
  */
-export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
+export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: opts.logger ?? true,
   });
+
+  await app.register(fastifyWebsocket);
+
+  // Own the hub's heartbeat lifecycle only when WE created it —
+  // an injected hub is owned (started/stopped) by whoever constructed
+  // it (index.ts, alongside its Redis subscriber).
+  const connectionHub = opts.connectionHub ?? new ConnectionHub(app.log);
+  if (!opts.connectionHub) {
+    connectionHub.startHeartbeat();
+  }
 
   /**
    * Liveness probe: "is the process up and serving HTTP?"
@@ -120,6 +149,19 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
     });
 
     return { symbol, ...result };
+  });
+
+  /**
+   * Live dashboard feed: prices and compliance drift alerts, pushed
+   * the instant the consumer worker (Phase 8/10) produces them — via
+   * a Redis Pub/Sub subscriber in index.ts calling connectionHub's
+   * broadcast(). This route's only job is registering each connecting
+   * client with the hub; @fastify/websocket hands us the raw `ws`
+   * socket directly (current-version API — older versions nested it
+   * under `connection.socket`).
+   */
+  app.get("/ws", { websocket: true }, (socket) => {
+    connectionHub.add(socket);
   });
 
   return app;

@@ -1,9 +1,12 @@
 import "dotenv/config";
 import { Redis } from "ioredis";
+import pino from "pino";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { createPrismaClient } from "./db.js";
 import { decimalToNumber } from "./decimal.js";
+import { ConnectionHub } from "./realtime/connection-hub.js";
+import { REALTIME_CHANNEL, type RealtimeEvent } from "./realtime/events.js";
 
 const config = loadConfig();
 const prisma = createPrismaClient(config.databaseUrl);
@@ -11,7 +14,36 @@ const prisma = createPrismaClient(config.databaseUrl);
 // liveness) shouldn't require Redis to be reachable to answer.
 const redis = new Redis(config.redisUrl, { lazyConnect: true });
 
-const app = buildApp({
+const logger = pino(
+  process.env.NODE_ENV === "production" ? {} : { transport: { target: "pino-pretty" } },
+);
+
+// Owned here (not left to buildApp's internal default) because the
+// Redis subscriber below must broadcast through this EXACT instance —
+// the one the /ws route adds clients to.
+const connectionHub = new ConnectionHub(logger);
+connectionHub.startHeartbeat();
+
+// Pub/Sub subscribing requires its OWN dedicated connection — once a
+// connection calls .subscribe(), it can't run normal commands anymore
+// (see realtime/publisher.ts for why Pub/Sub, not Streams, is correct
+// here: no persistence needed for a live UI push).
+const subscriber = new Redis(config.redisUrl);
+subscriber.on("error", (err: Error) => logger.error({ err: err.message }, "subscriber error"));
+await subscriber.subscribe(REALTIME_CHANNEL);
+subscriber.on("message", (_channel, message) => {
+  try {
+    connectionHub.broadcast(JSON.parse(message) as RealtimeEvent);
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "dropped unparseable realtime message",
+    );
+  }
+});
+
+const app = await buildApp({
+  connectionHub,
   logger:
     process.env.NODE_ENV === "production"
       ? true // raw JSON lines: logs are data in production
@@ -62,9 +94,11 @@ try {
 /** Graceful shutdown: stop accepting, drain in-flight, then exit. */
 async function shutdown(signal: string): Promise<void> {
   app.log.info({ signal }, "shutting down");
+  connectionHub.stopHeartbeat();
   await app.close();
   await prisma.$disconnect();
   redis.disconnect();
+  subscriber.disconnect();
   process.exit(0);
 }
 

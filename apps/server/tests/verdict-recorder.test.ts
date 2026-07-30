@@ -81,9 +81,10 @@ describe("recordVerdict", () => {
     const fake = new FakePrisma(null, null, null, []);
     const registry = await buildRegistry(fake);
 
-    await recordVerdict(asPrisma(fake), registry, "ZZZZ", silentLogger);
+    const result = await recordVerdict(asPrisma(fake), registry, "ZZZZ", silentLogger);
 
     expect(fake.createdVerdicts).toHaveLength(0);
+    expect(result).toBeUndefined();
   });
 
   it("records a company's first-ever verdict with no drift alert (nothing to compare against)", async () => {
@@ -123,7 +124,7 @@ describe("recordVerdict", () => {
     );
     const registry = await buildRegistry(fake);
 
-    await recordVerdict(asPrisma(fake), registry, "AAPL", silentLogger);
+    const result = await recordVerdict(asPrisma(fake), registry, "AAPL", silentLogger);
 
     expect(fake.createdVerdicts[0]).toMatchObject({ status: "NON_COMPLIANT" });
     expect(fake.createdAlerts).toContainEqual(
@@ -137,6 +138,14 @@ describe("recordVerdict", () => {
     // detected event alongside the overall flip.
     expect(fake.createdAlerts).toContainEqual(
       expect.objectContaining({ type: "RATIO_THRESHOLD_CROSSED", ratio: "DEBT" }),
+    );
+
+    // The return value is what Phase 12's consumer worker uses to
+    // decide what to broadcast — it must mirror what was persisted.
+    expect(result?.status).toBe("NON_COMPLIANT");
+    expect(result?.driftEvents).toHaveLength(2);
+    expect(result?.driftEvents.map((e) => e.type)).toEqual(
+      expect.arrayContaining(["VERDICT_FLIPPED", "RATIO_THRESHOLD_CROSSED"]),
     );
   });
 
