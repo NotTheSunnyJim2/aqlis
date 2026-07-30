@@ -2,6 +2,7 @@ import { useState } from "react";
 import { StockList } from "./components/StockList.js";
 import { RatioBreakdown } from "./components/RatioBreakdown.js";
 import { DriftAlertFeed } from "./components/DriftAlertFeed.js";
+import { PurificationCalculator } from "./components/PurificationCalculator.js";
 
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -14,8 +15,9 @@ function App() {
         </h1>
         <StockList selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} />
         {selectedSymbol && (
-          <div className="mt-6">
-            <RatioBreakdown key={selectedSymbol} symbol={selectedSymbol} />
+          <div className="mt-6 space-y-6">
+            <RatioBreakdown key={`ratio-${selectedSymbol}`} symbol={selectedSymbol} />
+            <PurificationCalculator key={`purify-${selectedSymbol}`} symbol={selectedSymbol} />
           </div>
         )}
         <div className="mt-6">

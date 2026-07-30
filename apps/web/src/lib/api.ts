@@ -44,3 +44,33 @@ export async function fetchVerdict(symbol: string): Promise<VerdictDetail | null
   }
   return (await res.json()) as VerdictDetail;
 }
+
+export interface PurificationResult {
+  symbol: string;
+  dividendReceived: number;
+  nonCompliantIncomeRatio: number | null;
+  purificationAmount: number | null;
+  netAmount: number | null;
+}
+
+/**
+ * Unlike fetchVerdict, any non-2xx here throws — this is only ever
+ * called for a symbol the user already selected from a known-valid
+ * list, so a 404 would indicate something genuinely wrong, not a
+ * routine "no data yet" case worth swallowing.
+ */
+export async function calculatePurification(
+  symbol: string,
+  dividendReceived: number,
+): Promise<PurificationResult> {
+  const res = await fetch(`/api/companies/${encodeURIComponent(symbol)}/purification`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dividendReceived }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `Failed to calculate purification: HTTP ${res.status}`);
+  }
+  return (await res.json()) as PurificationResult;
+}
