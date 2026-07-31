@@ -155,3 +155,23 @@ npm run loadtest                   # defaults to http://localhost:3000
 ```
 
 Thresholds: p95 request duration under 500ms, error rate under 1%.
+
+## Known limitations
+
+Two things flagged during development and deliberately left as-is,
+rather than either silently ignored or force-fixed for their own sake:
+
+- **TypeScript is pinned below 6.1** (`typescript-eslint`'s current
+  published peer range is `>=4.8.4 <6.1.0` — TS 7, the Go-native
+  compiler, isn't supported by their type-aware lint rules yet).
+  Externally blocked, not forgotten; re-check `npm view typescript-eslint
+  peerDependencies` periodically and lift the pin once it clears `<6.1.0`.
+- **Every process shares one `AppConfig` schema** (`src/config.ts`), so
+  e.g. the API server requires `FINNHUB_API_KEY` at boot even though it
+  never subscribes to Finnhub. Phase 20 made this marginally less
+  wasteful — the API process now genuinely needs `FMP_API_KEY` for the
+  Monte Carlo feature's historical data fetch — but `FINNHUB_API_KEY`
+  and `WATCHLIST_SYMBOLS` remain unused there. A real fix needs a
+  per-entrypoint config split; not done because Fly's process groups
+  (ADR-003) share secrets app-wide regardless, so splitting the schema
+  alone wouldn't change what's actually deployed to each machine.

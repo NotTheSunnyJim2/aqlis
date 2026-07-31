@@ -35,8 +35,7 @@ jobs:
       # Last, not first: bundling is the most expensive step, and
       # lint/typecheck/test already catch most real bugs faster and
       # cheaper — same fail-fast ordering as the rest of this pipeline.
-      # Only apps/web has a real build script today; apps/server's
-      # production build is deliberately deferred to the Docker phase
-      # (Phase 17) — see ADR/deferred item ⑥, nothing to verify yet
-      # without emit config that nothing consumes.
+      # Builds both workspaces: apps/web's Vite bundle and apps/server's
+      # tsc build (tsconfig.build.json, added Phase 16) — the exact
+      # config the Dockerfile's build stage uses for the deployed image.
       - run: npm run build
