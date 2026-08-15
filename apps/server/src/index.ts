@@ -6,6 +6,7 @@ import pino from "pino";
 import { buildApp, type PortfolioComparisonCache } from "./app.js";
 import { FmpHistoricalClient } from "./analytics/fmp-historical-client.js";
 import { buildPortfolioComparison } from "./analytics/portfolio-comparison.js";
+import { cached } from "./cache.js";
 import { loadConfig } from "./config.js";
 import { createPrismaClient } from "./db.js";
 import { decimalToNumber } from "./decimal.js";
@@ -133,6 +134,40 @@ const portfolioComparisonInterval = setInterval(
   MONTE_CARLO_REFRESH_INTERVAL_MS,
 );
 
+// Neon's free tier autosuspends its compute after 5 minutes of true
+// inactivity — but Fly polls /health/ready every 15s (fly.toml), and
+// an uncached checkDatabase did a real SELECT 1 on every single call.
+// That meant the database NEVER saw 5 quiet minutes and stayed
+// "active" (billing compute-hours) around the clock, even overnight
+// with zero real traffic — confirmed as the root cause of burning
+// ~90 of the monthly 100 CU-hour cap by the HALFWAY point of the
+// month, not gradual real usage. Caching the result means Fly still
+// gets an instant response every 15s, but the actual Postgres/Redis
+// ping only happens once every 10 minutes — comfortably longer than
+// the 5-minute autosuspend window, so genuine idle periods (nights,
+// low-traffic stretches) let compute actually suspend between checks.
+// Tradeoff: a real outage could take up to 10 minutes to show up in
+// /health/ready, instead of 15s — acceptable for a portfolio project,
+// not for anything with a real uptime SLA.
+const HEALTH_CHECK_CACHE_TTL_MS = 10 * 60 * 1000;
+
+const checkDatabase = cached(async () => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}, HEALTH_CHECK_CACHE_TTL_MS);
+
+const checkRedis = cached(async () => {
+  try {
+    return (await redis.ping()) === "PONG";
+  } catch {
+    return false;
+  }
+}, HEALTH_CHECK_CACHE_TTL_MS);
+
 const app = await buildApp({
   connectionHub,
   getPortfolioComparison: () => portfolioComparisonCache,
@@ -141,21 +176,8 @@ const app = await buildApp({
     process.env.NODE_ENV === "production"
       ? true // raw JSON lines: logs are data in production
       : { transport: { target: "pino-pretty" } },
-  checkDatabase: async () => {
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      return true;
-    } catch {
-      return false;
-    }
-  },
-  checkRedis: async () => {
-    try {
-      return (await redis.ping()) === "PONG";
-    } catch {
-      return false;
-    }
-  },
+  checkDatabase,
+  checkRedis,
   listCompanies: async () => {
     // A single query: `take: 1, orderBy` on each relation asks Prisma
     // for each company's LATEST verdict and LATEST price snapshot
